@@ -33,7 +33,7 @@ class node:
 def genSpar(n):
     # generate a random sparse matrix with nonzeros labled 1
     A = np.identity(n)
-    for i in range(0,math.floor(n**2/10)):
+    for i in range(0,math.floor(n**2/20)):
         [p,q] = [random.randint(0,n-1),random.randint(0,n-1)]
         A[p][q] = 1
         A[q][p] = 1
@@ -145,7 +145,7 @@ def genRanPermu(n):
         L0.append(j)
     return L0
 
-def reorderByPermu(A,L):
+def reorderByPerm(A,L):
     #To get the matrix after reordering
     n = len(L)
     P = np.zeros((n,n))
@@ -158,9 +158,60 @@ def reorderByPermu(A,L):
     A1 = np.asarray(A1)
     return A1
 
+def reorderBySeparator(A,V):
+    #put seperators at the end
+    L = [i for i in range(len(A)) if i not in V]
+    L.extend(V)
+    A = reorderByPerm(A, L)
+    return A
+
+def RCM(A, root):
+    #reversed Cuthill McKee method return permutation and a pseudo-pripheral vertice
+    [adj, xadj] = graRepSpar(A)
+    new_root = {root}
+    perm = [root]
+    root = set()
+    while new_root - root != set() or new_root == set():
+        adding = set()
+        sorted_adding = []
+        root = new_root.copy()
+        for i in root:
+            for j in range(xadj[i], xadj[i+1]):
+                v = adj[j]
+                if v not in root:
+                    adding.add(v)
+        if adding == set():
+            break
+        dict_adding = {i: xadj[i+1]-xadj[i] for i in adding}
+        sorted_adding = sorted(dict_adding)
+        perm.extend(sorted_adding)
+        v = sorted_adding[0]
+        new_root = new_root|adding
+        print(perm)
+    return list(reversed(perm)),v
+
+def printMatrix(A):
+    #print the matrix and return the number of fills
+    count = 0
+    for i in range(n):
+        for j in range(n):
+            if A[i][j] != 0 and i == j:
+                print('%2s' % i, end="")
+            elif A[i][j] == 1: print('%2s' % "*", end="")
+            elif A[i][j] == 2: 
+                print('%2s' % "+", end="")
+                count = count+1
+            else: print('%2s' % " ", end="")
+        print()
+    return count
+
+
 #here I generate random connected sparse matrix and compute the fills
-n = 20
+n = 40
 A = genConSpar(n)
+
+
+
 for i in range(n):
     for j in range(n):
         if A[i][j] == 1 and i == j:
@@ -168,16 +219,16 @@ for i in range(n):
         elif A[i][j] == 1: print(" *", end="")
         else: print(" ", end=" ")
     print()
-print(upperSpar(A))
+print(graRepSpar(A))
 B=getFill(A)
-for i in range(n):
-    for j in range(n):
-        if B[i][j] != 0 and i == j:
-            print('%2s' % i, end="")
-        elif B[i][j] == 1: print('%2s' % "*", end="")
-        elif B[i][j] == 2: print('%2s' % "+", end="")
-        else: print('%2s' % " ", end="")
-    print()
+printMatrix(B)
+root = 0
+L, root = RCM(A, root)
+L, root = RCM(A, root)
+print(L)
+C = reorderByPerm(A, L)
+C = getFill(C)
+printMatrix(C)
 
 '''
 #visualize graph
