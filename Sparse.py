@@ -187,8 +187,40 @@ def RCM(A, root):
         perm.extend(sorted_adding)
         v = sorted_adding[0]
         new_root = new_root|adding
-        print(perm)
     return list(reversed(perm)),v
+
+def edgeSparator(A, V):
+    #from separation generate edge separator
+    edge = []
+    [adj, xadj] = upperSpar(A)
+    for v in V:
+        for i in v:
+            for j in range(xadj[i], xadj[i+1]):
+                m = adj[j]
+                if m not in v:
+                    edge.append((i, m))
+    return edge
+
+def verticesSeparator(V):
+    deg = {}
+    separator = set()
+    for edge in V:
+        (i, j) = edge
+        for m in [i,j]:
+            try:
+                deg[m] += 1
+            except KeyError:
+                deg[m] = 1
+    for edge in V:
+        (i, j) = edge
+        if i in separator or j in separator:
+            pass
+        if deg[i] > deg[j]:
+            separator.add(i)
+        else:
+            separator.add(j)
+#        print(separator)
+    return separator
 
 def printMatrix(A):
     #print the matrix and return the number of fills
@@ -221,14 +253,18 @@ for i in range(n):
     print()
 print(graRepSpar(A))
 B=getFill(A)
-printMatrix(B)
+print(printMatrix(B))
 root = 0
 L, root = RCM(A, root)
 L, root = RCM(A, root)
 print(L)
 C = reorderByPerm(A, L)
 C = getFill(C)
-printMatrix(C)
+print(printMatrix(C))
+V=[set(range(0,int(n/2))), set(range(int(n/2),n))]
+E=edgeSparator(C, V)
+#print(E)
+print(verticesSeparator(E))
 
 '''
 #visualize graph
