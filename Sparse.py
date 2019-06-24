@@ -237,6 +237,16 @@ def printMatrix(A):
         print()
     return count
 
+def minDegree(A):
+    [adj, xadj] = graRepSpar(A)
+    degree = {}
+    for i in range(len(A)):
+        degree[i] = xadj[i+1]-xadj[i]
+    L = sorted(degree.items(), key=lambda kv: kv[1])
+    L = [i for (i, j) in L]
+    print(L)
+    return L
+
 
 #here I generate random connected sparse matrix and compute the fills
 n = 40
@@ -259,13 +269,20 @@ L, root = RCM(A, root)
 L, root = RCM(A, root)
 print(L)
 C = reorderByPerm(A, L)
-C = getFill(C)
-print(printMatrix(C))
+D = getFill(C)
+print(printMatrix(D))
 V=[set(range(0,int(n/2))), set(range(int(n/2),n))]
-E=edgeSparator(C, V)
+E=edgeSparator(D, V)
 #print(E)
-print(verticesSeparator(E))
-
+S = verticesSeparator(E)
+print(S)
+F = reorderBySeparator(C,S)
+F = getFill(F)
+print(printMatrix(F))
+L = minDegree(A)
+G = reorderByPerm(A, L)
+G = getFill(G)
+print(printMatrix(G))
 '''
 #visualize graph
 rows, cols = np.where(A == 1)
