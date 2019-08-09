@@ -11,6 +11,7 @@ import Sparse_2 as sp
 import tensorflow as tf
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 
 learning_rate = 0.95
@@ -108,11 +109,14 @@ def q_network(x_state, scope):
         output = tf.contrib.layers.fully_connected(
                 hidden_3, n_output, activation_fn=None,
                 weights_initializer=initializer)
+        separator = x_state[:,0,:n_output]
+        print(np.shape(separator))
+        new_output= np.multiply(output, separator)
     trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                        scope=scope.name)
     trainable_vars_by_name = {var.name[len(scope.name):]: var
                                        for var in trainable_vars}
-    return output, trainable_vars_by_name
+    return new_output, trainable_vars_by_name
 
 x_state = tf.placeholder(tf.float32, shape=[None,n_input, length])
 actor_q_values, actor_vars = q_network(x_state, scope="q_network/actor")
@@ -135,6 +139,8 @@ training_op = optimizer.minimize(cost, global_step=global_step)
 
 init = tf.global_variables_initializer()
 saver = tf.train.Saver()
+saver1 = tf.train.Saver(var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope = "q_network/actor"))
+
 
 from collections import deque
 
@@ -142,30 +148,30 @@ replay_memory_size = 1000
 replay_memory = deque([], maxlen=replay_memory_size)
 
 def sample_memories(batch_size):
-    indices = np.random.permutation(len(replay_memory))[:batch_size]
+    indices = np.random.permutation(min(len(replay_memory),10*batch_size))[:batch_size]
     cols = [[], [], [], []] #state, action, reward, next_state
     for idx in indices:
-        memory = replay_memory[idx]
+        memory = replay_memory[len(replay_memory)-idx-1]
         for col, value in zip(cols,memory):
             col.append(value)
     cols = [np.array(col) for col in cols]
     return (cols[0], cols[1], cols[2].reshape(-1, 1),
             cols[3])
 
-eps_min = 0.05
+eps_min = 0.1
 eps_max = 1.0
-eps_decay_steps = 3000
+eps_decay_steps = 1000
 
-def epsilon_greedy(q_values, step):
+def epsilon_greedy(q_values, step, separator):
     epsilon = max(eps_min, eps_max - (eps_max-eps_min) * step/eps_decay_steps)
     if np.random.rand() < epsilon:
         f.write('random')
-        return np.random.randint(n_output)
+        return np.random.randint(0, n_action)
     else:
         return np.argmax(q_values)
     
-n_steps = 10000
-training_start = 1000
+n_steps = 1500
+training_start = 100
 training_interval = 5
 save_steps = 50
 copy_steps = 25
@@ -173,9 +179,12 @@ discount_rate = 0.70
 batch_size = 50
 iteration = 0
 checkpoint_path = "./my_dqn.ckpt"
+test_path = "./my_test.ckpt"
 safe_adj = adj.copy()
 print(len(safe_adj))
 safe_xadj = xadj.copy()
+iteration_v = np.arange(1500)
+q_v = [0]*1500
 
 with tf.Session() as sess:
     if os.path.isfile(checkpoint_path):
@@ -190,7 +199,7 @@ with tf.Session() as sess:
         
         state = preprocess(separator, adj, xadj)
         q_values = actor_q_values.eval(feed_dict={x_state: state})
-        action = epsilon_greedy(q_values, step)
+        action = epsilon_greedy(q_values, step, separator)
         
         adj = safe_adj.copy()
         xadj = safe_xadj.copy()
@@ -203,13 +212,32 @@ with tf.Session() as sess:
                               action,
                               reward,
                               next_state))
+        
+        if reward != 0:
+            for i in range(1,8):
+                n_turn = i%4
+                n_reflect = (i-n_turn)/4
+                
+                add_separator = {sp.add(n_turn, n_reflect, ver) 
+                    for ver in separator}
+                add_next_separator = {sp.add(n_turn, n_reflect, ver) 
+                    for ver in next_separator}
+                add_action = sp.add(n_turn, n_reflect, action)
+                                
+                add_state = preprocess(add_separator, adj, xadj)
+                add_action = add_action
+                add_reward = reward
+                add_next_state = preprocess(add_next_separator, adj, xadj)
+
         separator = next_separator
+        
         f.write(str(action))
         f.write(' ')
         f.write(str(separator))
         f.write(' ')
         f.write(str(reward))
         f.write('\n')
+        
         if iteration < training_start or iteration % training_interval != 0:
             continue
         
@@ -223,6 +251,11 @@ with tf.Session() as sess:
                 feed_dict={x_state: x_next_state_val})
         max_next_q_values = np.max(next_q_values, axis=1, keepdims=True)
         y_val = rewards + discount_rate * max_next_q_values
+        for i in range(len(rewards)):
+            if rewards[i] == 0:
+                y_val[i] = max_next_q_values[i]
+            else:
+                y_val[i] = rewards[i] + discount_rate * max_next_q_values[i]
             
         critic_q_values.eval(feed_dict={x_state: x_state_val})
 
@@ -230,9 +263,14 @@ with tf.Session() as sess:
                                    x_action: x_action_val,
                                    y: y_val})
         print(step)
+        q_v[step] = max(y_val)
+        plt.plot(iteration_v, q_v)
+        plt.yscale("log")
+        plt.show()
         if step % copy_steps == 0:
             copy_critic_to_actor.run()
         
         if step % save_steps == 0:
             saver.save(sess, checkpoint_path)
+            saver1.save(sess, test_path)
 f.close()

@@ -297,6 +297,7 @@ def reward(adj, xadj, separator):
                 for j in v[i].children:
                     w.add(j.index)
         reward = reward*len(w)
+    print(len(temp))
     reward = -1/reward
     return reward
     
@@ -308,9 +309,10 @@ def step(action, adj, xadj, separator):
         if checkSeparator(adj, xadj, separator) == False:
             neighbour = findNeighbour(adj, xadj, action)
             separator = separator.union(neighbour)
+            separator.add(action)
             reward_bon = 0
     else:
-        reward_cons = -0.05
+        reward_bon = 0
     '''
     else:
         separator.add(action)
@@ -319,8 +321,28 @@ def step(action, adj, xadj, separator):
             m = separator.remove(action)
             reward_cons = 0.5
     '''
-    reward0 = (-ini_reward + reward(adj, xadj, separator))
+    reward0 = (-ini_reward + reward(adj, xadj, separator)) + reward_bon
     return separator, reward0
+
+def turn(ver):
+    a1 = ver % 5
+    a2 = (ver -a1)/5
+    new_ver = 5*(4-a1) + a2
+    return new_ver
+
+def reflect(ver):
+    a1 = ver % 5
+    a2 = (ver -a1)/5
+    new_ver = 5*a2 +(4-a1)
+    return new_ver
+
+def add(n_turn, n_reflect, ver):
+    for i in range(n_turn):
+        ver = turn(ver)
+    if n_reflect == 1:
+        ver = reflect(ver)
+    return ver
+
 '''
 A = [[1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
      [1,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
